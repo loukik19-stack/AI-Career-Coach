@@ -1,11 +1,19 @@
-from ai_engine import ask_ai
+from ai_engine import ask_ai_json
 
-print("Testing Gemini connection...")
+print("Testing structured Gemini response...")
 print()
 
-response = ask_ai(
-    "Reply with exactly: Gemini connection successful!"
-)
+prompt = """
+Return ONLY a JSON object with these fields:
+
+{
+    "name": "CareerAI",
+    "status": "working",
+    "score": 95
+}
+"""
+
+result = ask_ai_json(prompt)
 
 print("Gemini response:")
-print(response)
+print(result)
