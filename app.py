@@ -1,7 +1,7 @@
 import streamlit as st
 
 from resume_parser import extract_text_from_pdf
-from ai_engine import ask_ai
+from ai_engine import ask_ai, ask_ai_json
 
 
 # ==========================================
@@ -26,34 +26,12 @@ st.markdown(
     .main-title {
         font-size: 42px;
         font-weight: 700;
-        margin-bottom: 5px;
     }
 
     .subtitle {
         font-size: 18px;
         color: #666;
         margin-bottom: 25px;
-    }
-
-    .score-card {
-        padding: 20px;
-        border-radius: 15px;
-        background-color: #f5f7fa;
-        text-align: center;
-        border: 1px solid #e5e7eb;
-    }
-
-    .score-number {
-        font-size: 38px;
-        font-weight: 700;
-    }
-
-    .section-card {
-        padding: 20px;
-        border-radius: 15px;
-        background-color: #f8fafc;
-        border: 1px solid #e5e7eb;
-        margin-bottom: 15px;
     }
 
     </style>
@@ -113,15 +91,15 @@ if page == "🏠 Dashboard":
             """
             ### 📄 Resume Intelligence
 
-            Upload your resume and compare it
-            against a target job description.
+            Analyze your resume against a
+            target job description.
 
-            **Identify:**
-            - Match score
+            **Discover:**
+            - Resume match
             - ATS compatibility
             - Skill gaps
-            - Missing keywords
-            - Improvement opportunities
+            - Keywords
+            - Improvements
             """
         )
 
@@ -131,10 +109,10 @@ if page == "🏠 Dashboard":
             """
             ### 🎤 AI Mock Interview
 
-            Practice realistic technical and
-            behavioral interview questions.
+            Practice technical and behavioral
+            interview questions.
 
-            **Get feedback on:**
+            **Receive feedback on:**
             - Relevance
             - Clarity
             - Structure
@@ -153,8 +131,8 @@ if page == "🏠 Dashboard":
             **Monitor:**
             - Resume performance
             - Interview attempts
-            - Average scores
-            - Improvement areas
+            - Scores
+            - Weak areas
             """
         )
 
@@ -194,81 +172,79 @@ elif page == "📄 Resume Analyzer":
     st.title("📄 Resume Intelligence")
 
     st.write(
-        "Analyze how well your resume matches a target job "
-        "and discover exactly what you should improve."
+        "Analyze your resume against a target job "
+        "and identify exactly what you should improve."
     )
 
     st.divider()
 
-    # --------------------------------------
-    # INPUTS
-    # --------------------------------------
-
     col1, col2 = st.columns(2)
+
+    # --------------------------------------
+    # RESUME INPUT
+    # --------------------------------------
 
     with col1:
 
-        st.subheader("📄 Your Resume")
+        st.subheader("📄 Resume")
 
         uploaded_file = st.file_uploader(
-            "Upload your resume as PDF",
+            "Upload your resume PDF",
             type=["pdf"]
         )
 
         if uploaded_file:
 
             st.success(
-                f"✓ {uploaded_file.name} uploaded"
+                f"✓ {uploaded_file.name}"
             )
+
+    # --------------------------------------
+    # JOB DESCRIPTION INPUT
+    # --------------------------------------
 
     with col2:
 
         st.subheader("💼 Target Job")
 
         job_description = st.text_area(
-            "Paste the complete job description",
+            "Paste the job description",
             height=220,
             placeholder=(
-                "Example:\n\n"
-                "We are looking for a Python developer "
-                "with experience in SQL, REST APIs, Git..."
+                "Paste the complete job description here..."
             )
         )
 
     st.divider()
 
     # --------------------------------------
-    # ANALYZE BUTTON
+    # ANALYZE
     # --------------------------------------
 
-    analyze_button = st.button(
+    if st.button(
         "🤖 Analyze Resume",
         type="primary",
         use_container_width=True
-    )
-
-    if analyze_button:
+    ):
 
         if not uploaded_file:
 
             st.warning(
-                "⚠️ Please upload your resume PDF first."
+                "⚠️ Please upload your resume PDF."
             )
 
         elif not job_description.strip():
 
             st.warning(
-                "⚠️ Please paste the job description first."
+                "⚠️ Please paste the job description."
             )
 
         else:
 
-            # --------------------------------------
-            # EXTRACT RESUME TEXT
-            # --------------------------------------
+            # Extract resume text
 
             with st.spinner(
-                "📄 Reading your resume..."
+                "📄 Reading resume..."
             ):
 
                 resume_text = extract_text_from_pdf(
@@ -278,94 +254,110 @@ elif page == "📄 Resume Analyzer":
             if not resume_text.strip():
 
                 st.error(
-                    "Could not extract text from this PDF. "
-                    "Please try another PDF."
+                    "Could not extract text from this PDF."
                 )
 
             else:
 
                 # --------------------------------------
-                # AI PROMPT
+                # STRUCTURED AI PROMPT
                 # --------------------------------------
 
                 prompt = f"""
 You are an expert ATS resume analyst,
 technical recruiter, and career coach.
 
-Your job is to analyze a candidate's resume
-against a target job description.
+Analyze the candidate's resume against
+the target job description.
 
 IMPORTANT RULES:
 
-1. Do NOT invent candidate experience.
-2. Do NOT claim the candidate has a skill
-   unless it appears in the resume.
-3. Distinguish clearly between:
-   - skills the candidate already demonstrates
-   - skills missing from the resume
-   - skills that are weak or insufficiently demonstrated
-4. Base every recommendation on the resume
-   and job description.
-5. Be concise but useful.
+- Never invent candidate experience.
+- Never invent skills.
+- Never invent achievements.
+- Base your analysis only on the supplied resume
+  and job description.
+- Distinguish between demonstrated skills,
+  missing skills, and weakly demonstrated skills.
+
+Return ONLY valid JSON.
+
+Use EXACTLY this structure:
+
+{{
+    "match_score": 0,
+    "ats_score": 0,
+
+    "matched_skills": [],
+    "missing_skills": [],
+    "weak_skills": [],
+
+    "experience_gaps": [],
+
+    "ats_keywords": [],
+
+    "resume_improvements": [],
+
+    "high_priority_actions": [],
+
+    "overall_assessment": "",
+
+    "rewrite_suggestions": []
+}}
+
+SCORING:
+
+match_score:
+0-100 estimate of how well the resume matches
+the target job.
+
+ats_score:
+0-100 estimate of ATS compatibility.
+
+matched_skills:
+Important job skills clearly demonstrated
+in the resume.
+
+missing_skills:
+Important job skills not demonstrated
+in the resume.
+
+weak_skills:
+Skills that appear but are weak,
+unclear, or insufficiently demonstrated.
+
+experience_gaps:
+Important job requirements or experience
+not demonstrated by the resume.
+
+ats_keywords:
+Important keywords from the job description
+that could naturally be incorporated into
+the resume when truthful.
+
+resume_improvements:
+Exactly 5 specific improvements.
+
+high_priority_actions:
+Exactly 3 actions.
+
+overall_assessment:
+A concise professional assessment.
+
+rewrite_suggestions:
+Exactly 3 examples of how existing resume
+bullet points could be rewritten.
+
+Do not fabricate information.
 
 RESUME:
 
 {resume_text}
 
-TARGET JOB DESCRIPTION:
+JOB DESCRIPTION:
 
 {job_description}
-
-Provide the analysis using EXACTLY these headings:
-
-MATCH SCORE:
-Give a score from 0-100 representing how well
-the resume matches the job.
-
-ATS SCORE:
-Give a score from 0-100 representing how well
-the resume is optimized for ATS screening.
-
-MATCHED SKILLS:
-List important skills from the job description
-that are clearly present in the resume.
-
-MISSING SKILLS:
-List important job requirements that are not
-demonstrated in the resume.
-
-WEAK SKILLS:
-List skills that appear but are weak,
-unclear, or insufficiently demonstrated.
-
-EXPERIENCE GAPS:
-Identify important experience requirements
-that the resume does not demonstrate.
-
-ATS KEYWORDS:
-List important keywords from the job description
-that should appear naturally in the resume.
-
-RESUME IMPROVEMENTS:
-Give exactly 5 specific improvements.
-
-HIGH PRIORITY ACTIONS:
-Give exactly 3 actions the candidate should
-take first.
-
-OVERALL ASSESSMENT:
-Give a short professional assessment.
-
-RESUME REWRITE SUGGESTIONS:
-Provide 3 examples of how existing resume
-bullet points could be rewritten to be clearer,
-more specific, and achievement-oriented.
-
-IMPORTANT:
-Do not fabricate achievements, metrics,
-technologies, job titles, or experience.
 """
-
 
                 # --------------------------------------
                 # GEMINI ANALYSIS
@@ -375,29 +367,277 @@ technologies, job titles, or experience.
                     "🤖 Gemini is analyzing your resume..."
                 ):
 
-                    result = ask_ai(prompt)
+                    analysis = ask_ai_json(prompt)
 
                 # --------------------------------------
-                # DISPLAY RESULTS
+                # ERROR CHECK
                 # --------------------------------------
 
-                st.divider()
+                if "error" in analysis:
 
-                st.header("🧠 Resume Analysis")
+                    st.error(
+                        "AI analysis failed."
+                    )
 
-                st.caption(
-                    "AI-generated analysis based on your "
-                    "resume and target job description."
-                )
+                    st.code(
+                        analysis["error"]
+                    )
 
-                st.write(result)
+                else:
 
-                st.divider()
+                    # ----------------------------------
+                    # SCORE CARDS
+                    # ----------------------------------
 
-                st.success(
-                    "✅ Analysis complete. Use the feedback "
-                    "to tailor your resume to this role."
-                )
+                    st.divider()
+
+                    st.header("🎯 Resume Performance")
+
+                    score1, score2 = st.columns(2)
+
+                    with score1:
+
+                        st.metric(
+                            "Resume-JD Match",
+                            f"{analysis.get('match_score', 0)}/100"
+                        )
+
+                    with score2:
+
+                        st.metric(
+                            "ATS Compatibility",
+                            f"{analysis.get('ats_score', 0)}/100"
+                        )
+
+                    st.divider()
+
+                    # ----------------------------------
+                    # SKILLS
+                    # ----------------------------------
+
+                    skill1, skill2, skill3 = st.columns(3)
+
+                    with skill1:
+
+                        st.subheader("✅ Matched Skills")
+
+                        matched = analysis.get(
+                            "matched_skills",
+                            []
+                        )
+
+                        if matched:
+
+                            for skill in matched:
+
+                                st.success(
+                                    str(skill)
+                                )
+
+                        else:
+
+                            st.write(
+                                "No strong matches identified."
+                            )
+
+                    with skill2:
+
+                        st.subheader("⚠️ Missing Skills")
+
+                        missing = analysis.get(
+                            "missing_skills",
+                            []
+                        )
+
+                        if missing:
+
+                            for skill in missing:
+
+                                st.warning(
+                                    str(skill)
+                                )
+
+                        else:
+
+                            st.write(
+                                "No major missing skills identified."
+                            )
+
+                    with skill3:
+
+                        st.subheader("🟡 Weak Skills")
+
+                        weak = analysis.get(
+                            "weak_skills",
+                            []
+                        )
+
+                        if weak:
+
+                            for skill in weak:
+
+                                st.info(
+                                    str(skill)
+                                )
+
+                        else:
+
+                            st.write(
+                                "No major weak skills identified."
+                            )
+
+                    # ----------------------------------
+                    # EXPERIENCE GAPS
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "📌 Experience Gaps"
+                    )
+
+                    gaps = analysis.get(
+                        "experience_gaps",
+                        []
+                    )
+
+                    if gaps:
+
+                        for gap in gaps:
+
+                            st.write(
+                                f"• {gap}"
+                            )
+
+                    else:
+
+                        st.write(
+                            "No significant experience gaps identified."
+                        )
+
+                    # ----------------------------------
+                    # ATS KEYWORDS
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "🔑 Important ATS Keywords"
+                    )
+
+                    keywords = analysis.get(
+                        "ats_keywords",
+                        []
+                    )
+
+                    if keywords:
+
+                        st.write(
+                            " • ".join(
+                                str(keyword)
+                                for keyword in keywords
+                            )
+                        )
+
+                    else:
+
+                        st.write(
+                            "No additional keywords identified."
+                        )
+
+                    # ----------------------------------
+                    # IMPROVEMENTS
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "💡 Resume Improvements"
+                    )
+
+                    improvements = analysis.get(
+                        "resume_improvements",
+                        []
+                    )
+
+                    for index, improvement in enumerate(
+                        improvements,
+                        start=1
+                    ):
+
+                        st.write(
+                            f"**{index}.** {improvement}"
+                        )
+
+                    # ----------------------------------
+                    # HIGH PRIORITY ACTIONS
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "🎯 High Priority Actions"
+                    )
+
+                    actions = analysis.get(
+                        "high_priority_actions",
+                        []
+                    )
+
+                    for index, action in enumerate(
+                        actions,
+                        start=1
+                    ):
+
+                        st.write(
+                            f"**{index}.** {action}"
+                        )
+
+                    # ----------------------------------
+                    # OVERALL ASSESSMENT
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "🧠 Overall Assessment"
+                    )
+
+                    st.info(
+                        analysis.get(
+                            "overall_assessment",
+                            "No assessment available."
+                        )
+                    )
+
+                    # ----------------------------------
+                    # REWRITE SUGGESTIONS
+                    # ----------------------------------
+
+                    st.divider()
+
+                    st.subheader(
+                        "✍️ Resume Rewrite Suggestions"
+                    )
+
+                    rewrites = analysis.get(
+                        "rewrite_suggestions",
+                        []
+                    )
+
+                    for index, rewrite in enumerate(
+                        rewrites,
+                        start=1
+                    ):
+
+                        st.write(
+                            f"**Example {index}**"
+
+                        )
+
+                        st.info(
+                            str(rewrite)
+                        )
 
 
 # ==========================================
@@ -442,11 +682,13 @@ elif page == "🎤 Mock Interview":
         )
 
     st.info(
-        f"🎯 Target Role: **{role}**  |  "
+        f"🎯 Target: **{role}** | "
         f"Difficulty: **{difficulty}**"
     )
 
-    st.subheader("💬 Interview Question")
+    st.subheader(
+        "💬 Interview Question"
+    )
 
     st.write(
         "**Tell me about yourself and why you "
@@ -458,7 +700,7 @@ elif page == "🎤 Mock Interview":
         height=220,
         placeholder=(
             "Type your answer as if you were "
-            "speaking to an interviewer..."
+            "speaking to the interviewer..."
         )
     )
 
@@ -471,7 +713,7 @@ elif page == "🎤 Mock Interview":
         if not answer.strip():
 
             st.warning(
-                "⚠️ Please enter your answer first."
+                "⚠️ Please enter your answer."
             )
 
         else:
@@ -479,7 +721,7 @@ elif page == "🎤 Mock Interview":
             prompt = f"""
 You are an expert interview coach.
 
-Evaluate the candidate's answer fairly.
+Evaluate this candidate's answer.
 
 ROLE:
 {role}
@@ -488,52 +730,49 @@ DIFFICULTY:
 {difficulty}
 
 QUESTION:
-Tell me about yourself and why you are
-interested in this role.
+Tell me about yourself and why you
+are interested in this role.
 
-CANDIDATE ANSWER:
+ANSWER:
 {answer}
 
-Evaluate the answer on:
+Evaluate:
 
 1. Relevance
 2. Clarity
 3. Confidence
 4. Structure
 5. Communication
-
-Give each a score from 0-100.
+6. Overall score from 0-100
 
 Then provide:
 
-OVERALL SCORE:
-Give one score from 0-100.
-
 WHAT WAS DONE WELL:
-Give 3 specific strengths.
+3 specific strengths.
 
 WHAT TO IMPROVE:
-Give 3 specific improvements.
+3 specific improvements.
 
 BETTER STRUCTURE:
-Explain how the candidate could structure
-this answer more effectively.
+Explain how the answer could be structured.
 
 COACHING TIP:
-Give one practical tip for the next attempt.
+One practical tip.
 
 Do not invent facts about the candidate.
 """
 
             with st.spinner(
-                "🤖 AI is evaluating your answer..."
+                "🤖 Evaluating answer..."
             ):
 
                 feedback = ask_ai(prompt)
 
             st.divider()
 
-            st.header("📊 Interview Feedback")
+            st.header(
+                "📊 Interview Feedback"
+            )
 
             st.write(feedback)
 
@@ -544,10 +783,12 @@ Do not invent facts about the candidate.
 
 elif page == "📊 Progress":
 
-    st.title("📊 Preparation Progress")
+    st.title(
+        "📊 Preparation Progress"
+    )
 
     st.write(
-        "Your preparation dashboard."
+        "Your career preparation dashboard."
     )
 
     st.divider()
@@ -577,7 +818,9 @@ elif page == "📊 Progress":
 
     st.divider()
 
-    st.subheader("🎯 Preparation Roadmap")
+    st.subheader(
+        "🎯 Preparation Roadmap"
+    )
 
     st.write(
         """
