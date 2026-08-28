@@ -1,24 +1,35 @@
 import os
-
 from dotenv import load_dotenv
-from openai import OpenAI
+from google import genai
 
-
-# Load the secret key from .env
+# Load variables from .env
 load_dotenv()
 
+# Get Gemini API key
+API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Create the OpenAI client
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
-
-
-def ask_ai(question):
-
-    response = client.responses.create(
-        model="gpt-5.6-luna",
-        input=question
+if not API_KEY:
+    raise ValueError(
+        "GEMINI_API_KEY was not found. "
+        "Please check your .env file."
     )
 
-    return response.output_text
+# Create Gemini client
+client = genai.Client(api_key=API_KEY)
+
+
+def ask_ai(prompt):
+    """
+    Send a prompt to Gemini and return the response.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+
+        return response.text
+
+    except Exception as e:
+        return f"AI Error: {str(e)}"

@@ -4,3 +4,4 @@ ollama
 pandas
 python-dotenv
 openai
+google-genai

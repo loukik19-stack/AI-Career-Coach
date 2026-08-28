@@ -26,24 +26,34 @@ st.markdown(
     .main-title {
         font-size: 42px;
         font-weight: 700;
+        margin-bottom: 5px;
     }
 
     .subtitle {
         font-size: 18px;
         color: #666;
-        margin-bottom: 30px;
+        margin-bottom: 25px;
     }
 
     .score-card {
-        padding: 25px;
+        padding: 20px;
         border-radius: 15px;
         background-color: #f5f7fa;
         text-align: center;
+        border: 1px solid #e5e7eb;
     }
 
     .score-number {
-        font-size: 40px;
+        font-size: 38px;
         font-weight: 700;
+    }
+
+    .section-card {
+        padding: 20px;
+        border-radius: 15px;
+        background-color: #f8fafc;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 15px;
     }
 
     </style>
@@ -58,8 +68,8 @@ st.markdown(
 
 st.sidebar.title("🎯 CareerAI")
 
-st.sidebar.write(
-    "AI Career Preparation Platform"
+st.sidebar.caption(
+    "AI-Powered Resume & Interview Coach"
 )
 
 page = st.sidebar.radio(
@@ -93,7 +103,7 @@ if page == "🏠 Dashboard":
 
     st.divider()
 
-    st.subheader("🚀 What can CareerAI do?")
+    st.subheader("🚀 Career Preparation Suite")
 
     col1, col2, col3 = st.columns(3)
 
@@ -101,13 +111,17 @@ if page == "🏠 Dashboard":
 
         st.info(
             """
-            ### 📄 Resume Analysis
+            ### 📄 Resume Intelligence
 
-            Analyze your resume against
-            a specific job description.
+            Upload your resume and compare it
+            against a target job description.
 
-            Identify skill gaps and
-            improve ATS compatibility.
+            **Identify:**
+            - Match score
+            - ATS compatibility
+            - Skill gaps
+            - Missing keywords
+            - Improvement opportunities
             """
         )
 
@@ -115,13 +129,16 @@ if page == "🏠 Dashboard":
 
         st.info(
             """
-            ### 🎤 Mock Interviews
+            ### 🎤 AI Mock Interview
 
-            Practice technical and
-            behavioral interviews.
+            Practice realistic technical and
+            behavioral interview questions.
 
-            Get structured AI feedback
-            on your answers.
+            **Get feedback on:**
+            - Relevance
+            - Clarity
+            - Structure
+            - Confidence
             """
         )
 
@@ -131,31 +148,41 @@ if page == "🏠 Dashboard":
             """
             ### 📊 Progress Tracking
 
-            Track your preparation,
-            interview scores and
-            improvement over time.
+            Track your preparation journey.
+
+            **Monitor:**
+            - Resume performance
+            - Interview attempts
+            - Average scores
+            - Improvement areas
             """
         )
 
     st.divider()
 
-    st.subheader("💡 How it works")
+    st.subheader("💡 How CareerAI Works")
 
-    st.write(
-        """
-        **1. Upload your resume**
+    steps = st.columns(5)
 
-        **2. Paste the job description**
+    with steps[0]:
+        st.markdown("### 1️⃣")
+        st.write("Upload Resume")
 
-        **3. CareerAI analyzes the match**
+    with steps[1]:
+        st.markdown("### 2️⃣")
+        st.write("Add Job Description")
 
-        **4. Identify your skill gaps**
+    with steps[2]:
+        st.markdown("### 3️⃣")
+        st.write("AI Analysis")
 
-        **5. Practice an adaptive interview**
+    with steps[3]:
+        st.markdown("### 4️⃣")
+        st.write("Practice Interview")
 
-        **6. Track your improvement**
-        """
-    )
+    with steps[4]:
+        st.markdown("### 5️⃣")
+        st.write("Track Progress")
 
 
 # ==========================================
@@ -167,104 +194,210 @@ elif page == "📄 Resume Analyzer":
     st.title("📄 Resume Intelligence")
 
     st.write(
-        "Compare your resume against a target job."
+        "Analyze how well your resume matches a target job "
+        "and discover exactly what you should improve."
     )
 
     st.divider()
 
-    uploaded_file = st.file_uploader(
-        "Upload your resume",
-        type=["pdf"]
-    )
+    # --------------------------------------
+    # INPUTS
+    # --------------------------------------
 
-    job_description = st.text_area(
-        "💼 Job Description",
-        height=250,
-        placeholder=(
-            "Paste the complete job description here..."
-        )
-    )
+    col1, col2 = st.columns(2)
 
-    if uploaded_file:
+    with col1:
 
-        st.success(
-            f"Resume uploaded: {uploaded_file.name}"
+        st.subheader("📄 Your Resume")
+
+        uploaded_file = st.file_uploader(
+            "Upload your resume as PDF",
+            type=["pdf"]
         )
 
-    if st.button(
+        if uploaded_file:
+
+            st.success(
+                f"✓ {uploaded_file.name} uploaded"
+            )
+
+    with col2:
+
+        st.subheader("💼 Target Job")
+
+        job_description = st.text_area(
+            "Paste the complete job description",
+            height=220,
+            placeholder=(
+                "Example:\n\n"
+                "We are looking for a Python developer "
+                "with experience in SQL, REST APIs, Git..."
+            )
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # ANALYZE BUTTON
+    # --------------------------------------
+
+    analyze_button = st.button(
         "🤖 Analyze Resume",
-        type="primary"
-    ):
+        type="primary",
+        use_container_width=True
+    )
+
+    if analyze_button:
 
         if not uploaded_file:
 
             st.warning(
-                "Please upload your resume."
+                "⚠️ Please upload your resume PDF first."
             )
 
         elif not job_description.strip():
 
             st.warning(
-                "Please paste the job description."
+                "⚠️ Please paste the job description first."
             )
 
         else:
 
-            resume_text = extract_text_from_pdf(
-                uploaded_file
-            )
+            # --------------------------------------
+            # EXTRACT RESUME TEXT
+            # --------------------------------------
 
-            prompt = f"""
-You are an expert recruitment and career coach.
+            with st.spinner(
+                "📄 Reading your resume..."
+            ):
 
-Analyze this resume against the job description.
+                resume_text = extract_text_from_pdf(
+                    uploaded_file
+                )
 
-Do NOT invent information about the candidate.
+            if not resume_text.strip():
+
+                st.error(
+                    "Could not extract text from this PDF. "
+                    "Please try another PDF."
+                )
+
+            else:
+
+                # --------------------------------------
+                # AI PROMPT
+                # --------------------------------------
+
+                prompt = f"""
+You are an expert ATS resume analyst,
+technical recruiter, and career coach.
+
+Your job is to analyze a candidate's resume
+against a target job description.
+
+IMPORTANT RULES:
+
+1. Do NOT invent candidate experience.
+2. Do NOT claim the candidate has a skill
+   unless it appears in the resume.
+3. Distinguish clearly between:
+   - skills the candidate already demonstrates
+   - skills missing from the resume
+   - skills that are weak or insufficiently demonstrated
+4. Base every recommendation on the resume
+   and job description.
+5. Be concise but useful.
 
 RESUME:
 
 {resume_text}
 
-JOB DESCRIPTION:
+TARGET JOB DESCRIPTION:
 
 {job_description}
 
-Provide:
+Provide the analysis using EXACTLY these headings:
 
-1. Resume-JD Match Score from 0-100
+MATCH SCORE:
+Give a score from 0-100 representing how well
+the resume matches the job.
 
-2. ATS Compatibility Score from 0-100
+ATS SCORE:
+Give a score from 0-100 representing how well
+the resume is optimized for ATS screening.
 
-3. Strongly Matched Skills
+MATCHED SKILLS:
+List important skills from the job description
+that are clearly present in the resume.
 
-4. Missing Skills
+MISSING SKILLS:
+List important job requirements that are not
+demonstrated in the resume.
 
-5. Weak Skills
+WEAK SKILLS:
+List skills that appear but are weak,
+unclear, or insufficiently demonstrated.
 
-6. Experience Gaps
+EXPERIENCE GAPS:
+Identify important experience requirements
+that the resume does not demonstrate.
 
-7. Important ATS Keywords
+ATS KEYWORDS:
+List important keywords from the job description
+that should appear naturally in the resume.
 
-8. Three Resume Improvements
+RESUME IMPROVEMENTS:
+Give exactly 5 specific improvements.
 
-9. Three Highest Priority Actions
+HIGH PRIORITY ACTIONS:
+Give exactly 3 actions the candidate should
+take first.
 
-10. A short overall assessment.
+OVERALL ASSESSMENT:
+Give a short professional assessment.
 
-Use clear headings and bullet points.
+RESUME REWRITE SUGGESTIONS:
+Provide 3 examples of how existing resume
+bullet points could be rewritten to be clearer,
+more specific, and achievement-oriented.
+
+IMPORTANT:
+Do not fabricate achievements, metrics,
+technologies, job titles, or experience.
 """
 
-            with st.spinner(
-                "🤖 AI is analyzing your resume..."
-            ):
 
-                result = ask_ai(prompt)
+                # --------------------------------------
+                # GEMINI ANALYSIS
+                # --------------------------------------
 
-            st.divider()
+                with st.spinner(
+                    "🤖 Gemini is analyzing your resume..."
+                ):
 
-            st.header("🧠 AI Analysis")
+                    result = ask_ai(prompt)
 
-            st.write(result)
+                # --------------------------------------
+                # DISPLAY RESULTS
+                # --------------------------------------
+
+                st.divider()
+
+                st.header("🧠 Resume Analysis")
+
+                st.caption(
+                    "AI-generated analysis based on your "
+                    "resume and target job description."
+                )
+
+                st.write(result)
+
+                st.divider()
+
+                st.success(
+                    "✅ Analysis complete. Use the feedback "
+                    "to tailor your resume to this role."
+                )
 
 
 # ==========================================
@@ -276,57 +409,69 @@ elif page == "🎤 Mock Interview":
     st.title("🎤 AI Mock Interview")
 
     st.write(
-        "Practice realistic interview questions."
+        "Practice realistic interview questions "
+        "and receive structured AI feedback."
     )
 
     st.divider()
 
-    role = st.selectbox(
-        "Target Role",
-        [
-            "Software Engineer",
-            "Data Analyst",
-            "Web Developer",
-            "AI / ML Engineer",
-            "General HR"
-        ]
-    )
+    col1, col2 = st.columns(2)
 
-    difficulty = st.selectbox(
-        "Difficulty",
-        [
-            "Beginner",
-            "Intermediate",
-            "Advanced"
-        ]
-    )
+    with col1:
+
+        role = st.selectbox(
+            "Target Role",
+            [
+                "Software Engineer",
+                "Data Analyst",
+                "Web Developer",
+                "AI / ML Engineer",
+                "General HR"
+            ]
+        )
+
+    with col2:
+
+        difficulty = st.selectbox(
+            "Difficulty",
+            [
+                "Beginner",
+                "Intermediate",
+                "Advanced"
+            ]
+        )
 
     st.info(
-        f"Target: {role} | Level: {difficulty}"
+        f"🎯 Target Role: **{role}**  |  "
+        f"Difficulty: **{difficulty}**"
     )
 
-    st.subheader("Interview Question")
+    st.subheader("💬 Interview Question")
 
     st.write(
-        "Tell me about yourself and why you "
-        "are interested in this role."
+        "**Tell me about yourself and why you "
+        "are interested in this role.**"
     )
 
     answer = st.text_area(
         "Your answer",
-        height=200,
-        placeholder="Type your answer here..."
+        height=220,
+        placeholder=(
+            "Type your answer as if you were "
+            "speaking to an interviewer..."
+        )
     )
 
     if st.button(
-        "Evaluate Answer",
-        type="primary"
+        "🤖 Evaluate My Answer",
+        type="primary",
+        use_container_width=True
     ):
 
         if not answer.strip():
 
             st.warning(
-                "Please enter an answer."
+                "⚠️ Please enter your answer first."
             )
 
         else:
@@ -334,7 +479,7 @@ elif page == "🎤 Mock Interview":
             prompt = f"""
 You are an expert interview coach.
 
-Evaluate this candidate's interview answer.
+Evaluate the candidate's answer fairly.
 
 ROLE:
 {role}
@@ -343,29 +488,45 @@ DIFFICULTY:
 {difficulty}
 
 QUESTION:
-Tell me about yourself and why you
-are interested in this role.
+Tell me about yourself and why you are
+interested in this role.
 
-ANSWER:
+CANDIDATE ANSWER:
 {answer}
 
-Evaluate:
+Evaluate the answer on:
 
 1. Relevance
 2. Clarity
 3. Confidence
 4. Structure
 5. Communication
-6. Overall score from 0-100
-7. What was done well
-8. What should improve
-9. A better answer structure
+
+Give each a score from 0-100.
+
+Then provide:
+
+OVERALL SCORE:
+Give one score from 0-100.
+
+WHAT WAS DONE WELL:
+Give 3 specific strengths.
+
+WHAT TO IMPROVE:
+Give 3 specific improvements.
+
+BETTER STRUCTURE:
+Explain how the candidate could structure
+this answer more effectively.
+
+COACHING TIP:
+Give one practical tip for the next attempt.
 
 Do not invent facts about the candidate.
 """
 
             with st.spinner(
-                "🤖 Evaluating your answer..."
+                "🤖 AI is evaluating your answer..."
             ):
 
                 feedback = ask_ai(prompt)
@@ -386,7 +547,7 @@ elif page == "📊 Progress":
     st.title("📊 Preparation Progress")
 
     st.write(
-        "Track your career preparation journey."
+        "Your preparation dashboard."
     )
 
     st.divider()
