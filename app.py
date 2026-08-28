@@ -212,7 +212,13 @@ if page == "🏠 Dashboard":
         st.markdown("### 5️⃣")
         st.write("Track Progress")
 
+# ==========================================
+# RESUME VERSION STORAGE
+# ==========================================
 
+if "resume_versions" not in st.session_state:
+
+    st.session_state.resume_versions = []
 # ==========================================
 # RESUME ANALYZER
 # ==========================================
@@ -227,7 +233,25 @@ elif page == "📄 Resume Analyzer":
     )
 
     st.divider()
+    # --------------------------------------
+    # RESUME VERSION
+    # --------------------------------------
 
+    resume_role = st.selectbox(
+        "🎯 Target Role",
+        [
+            "Software Engineer",
+            "Data Analyst",
+            "Web Developer",
+            "AI / ML Engineer",
+            "General"
+        ]
+    )
+
+    resume_version = st.text_input(
+        "📌 Resume Version Name",
+        placeholder="Example: Software Engineer - Version 1"
+    )
     col1, col2 = st.columns(2)
 
     # --------------------------------------
@@ -248,7 +272,35 @@ elif page == "📄 Resume Analyzer":
             st.success(
                 f"✓ {uploaded_file.name}"
             )
+        if st.button(
+            "💾 Save Resume Version",
+            use_container_width=True
+        ):
 
+            if not resume_version.strip():
+
+                st.warning(
+                    "Please enter a resume version name."
+                )
+
+            else:
+
+                resume_text = extract_text_from_pdf(
+                    uploaded_file
+                )
+
+                st.session_state.resume_versions.append(
+                    {
+                        "role": resume_role,
+                        "version": resume_version,
+                        "filename": uploaded_file.name,
+                        "text": resume_text
+                    }
+                )
+
+                st.success(
+                    f"✓ Saved '{resume_version}' for {resume_role}"
+                )
     # --------------------------------------
     # JOB DESCRIPTION INPUT
     # --------------------------------------
@@ -270,7 +322,14 @@ elif page == "📄 Resume Analyzer":
     # --------------------------------------
     # ANALYZE
     # --------------------------------------
+    if st.session_state.resume_versions:
+        st.subheader("📚 Saved Resume Versions")
 
+        for saved_resume in st.session_state.resume_versions:
+            st.write(
+                f"**{saved_resume['role']}** — "
+                f"{saved_resume['version']}"
+            )
     if st.button(
         "🤖 Analyze Resume",
         type="primary",
@@ -967,103 +1026,7 @@ if "error" in feedback:
         feedback["error"]
     )
 
-else:
 
-    score1, score2, score3, score4, score5 = st.columns(5)
-
-    with score1:
-
-        st.metric(
-            "Relevance",
-            f"{feedback.get('relevance', 0)}/100"
-        )
-
-    with score2:
-
-        st.metric(
-            "Clarity",
-            f"{feedback.get('clarity', 0)}/100"
-        )
-
-    with score3:
-
-        st.metric(
-            "Confidence",
-            f"{feedback.get('confidence', 0)}/100"
-        )
-
-    with score4:
-
-        st.metric(
-            "Structure",
-            f"{feedback.get('structure', 0)}/100"
-        )
-
-    with score5:
-
-        st.metric(
-            "Communication",
-            f"{feedback.get('communication', 0)}/100"
-        )
-
-    st.divider()
-
-    st.subheader(
-        "🏆 Overall Score"
-    )
-
-    st.metric(
-        "Interview Performance",
-        f"{feedback.get('overall_score', 0)}/100"
-    )
-
-    st.subheader(
-        "✅ What Was Done Well"
-    )
-
-    for point in feedback.get(
-        "what_was_done_well",
-        []
-    ):
-
-        st.success(
-            str(point)
-        )
-
-    st.subheader(
-        "⚠️ What To Improve"
-    )
-
-    for point in feedback.get(
-        "what_to_improve",
-        []
-    ):
-
-        st.warning(
-            str(point)
-        )
-
-    st.subheader(
-        "🧠 Better Answer Structure"
-    )
-
-    st.info(
-        feedback.get(
-            "better_answer_structure",
-            "No structure provided."
-        )
-    )
-
-    st.subheader(
-        "🎯 Coaching Tip"
-    )
-
-    st.info(
-        feedback.get(
-            "coaching_tip",
-            "No coaching tip provided."
-        )
-    )
 # ==========================================
 # PROGRESS
 # ==========================================
