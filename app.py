@@ -866,7 +866,7 @@ Rules:
             else:
 
                 evaluation_prompt = f"""
-You are an expert interview coach.
+You are an expert interview coach and recruiter.
 
 Evaluate the candidate's answer objectively.
 
@@ -885,56 +885,185 @@ QUESTION:
 CANDIDATE ANSWER:
 {answer}
 
-Evaluate the answer on:
+Return ONLY valid JSON.
 
-1. Relevance
-2. Clarity
-3. Confidence
-4. Structure
-5. Communication
+Use EXACTLY this structure:
 
-Give each category a score from 0-100.
+{{
+    "relevance": 0,
+    "clarity": 0,
+    "confidence": 0,
+    "structure": 0,
+    "communication": 0,
+    "overall_score": 0,
+    "what_was_done_well": [],
+    "what_to_improve": [],
+    "better_answer_structure": "",
+    "coaching_tip": ""
+}}
 
-Then calculate an overall score from 0-100.
+SCORING:
 
-Also provide:
+relevance:
+0-100. How directly the answer addresses the question.
 
-WHAT WAS DONE WELL:
-Exactly 3 points.
+clarity:
+0-100. How clearly and understandably the candidate communicates.
 
-WHAT TO IMPROVE:
-Exactly 3 points.
+confidence:
+0-100. How confidently and decisively the answer is expressed
+through the candidate's wording.
 
-BETTER ANSWER STRUCTURE:
-Give a practical structure the candidate
-could use to answer this question better.
+structure:
+0-100. How logically and effectively the answer is organized.
 
-COACHING TIP:
-Give exactly one practical interview tip.
+communication:
+0-100. Overall effectiveness and professionalism of the response.
+
+overall_score:
+0-100. Overall evaluation based on the five dimensions.
+
+what_was_done_well:
+Exactly 3 specific positive observations based only on the answer.
+
+what_to_improve:
+Exactly 3 specific and actionable improvements.
+
+better_answer_structure:
+A practical structure the candidate could use
+to answer this question more effectively.
+
+coaching_tip:
+Exactly one practical interview coaching tip.
 
 IMPORTANT:
-Do not invent facts about the candidate.
-Only evaluate what is actually present
-in the answer.
+- Do not invent facts about the candidate.
+- Do not assume experience that is not stated.
+- Evaluate only information contained in the answer.
+- Be constructive and specific.
+- Do not judge physical appearance.
+- Return ONLY valid JSON.
 """
 
                 with st.spinner(
                     "🤖 Evaluating your answer..."
                 ):
 
-                    feedback = ask_ai(
-                        evaluation_prompt
-                    )
+                    feedback = ask_ai_json(evaluation_prompt)
 
-                st.divider()
+st.divider()
 
-                st.header(
-                    "📊 Interview Feedback"
-                )
+st.header(
+    "📊 Interview Feedback"
+)
 
-                st.write(
-                    feedback
-                )
+if "error" in feedback:
+
+    st.error(
+        "AI evaluation failed."
+    )
+
+    st.code(
+        feedback["error"]
+    )
+
+else:
+
+    score1, score2, score3, score4, score5 = st.columns(5)
+
+    with score1:
+
+        st.metric(
+            "Relevance",
+            f"{feedback.get('relevance', 0)}/100"
+        )
+
+    with score2:
+
+        st.metric(
+            "Clarity",
+            f"{feedback.get('clarity', 0)}/100"
+        )
+
+    with score3:
+
+        st.metric(
+            "Confidence",
+            f"{feedback.get('confidence', 0)}/100"
+        )
+
+    with score4:
+
+        st.metric(
+            "Structure",
+            f"{feedback.get('structure', 0)}/100"
+        )
+
+    with score5:
+
+        st.metric(
+            "Communication",
+            f"{feedback.get('communication', 0)}/100"
+        )
+
+    st.divider()
+
+    st.subheader(
+        "🏆 Overall Score"
+    )
+
+    st.metric(
+        "Interview Performance",
+        f"{feedback.get('overall_score', 0)}/100"
+    )
+
+    st.subheader(
+        "✅ What Was Done Well"
+    )
+
+    for point in feedback.get(
+        "what_was_done_well",
+        []
+    ):
+
+        st.success(
+            str(point)
+        )
+
+    st.subheader(
+        "⚠️ What To Improve"
+    )
+
+    for point in feedback.get(
+        "what_to_improve",
+        []
+    ):
+
+        st.warning(
+            str(point)
+        )
+
+    st.subheader(
+        "🧠 Better Answer Structure"
+    )
+
+    st.info(
+        feedback.get(
+            "better_answer_structure",
+            "No structure provided."
+        )
+    )
+
+    st.subheader(
+        "🎯 Coaching Tip"
+    )
+
+    st.info(
+        feedback.get(
+            "coaching_tip",
+            "No coaching tip provided."
+        )
+    )
 # ==========================================
 # PROGRESS
 # ==========================================
