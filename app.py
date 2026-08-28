@@ -3,7 +3,57 @@ import streamlit as st
 from resume_parser import extract_text_from_pdf
 from ai_engine import ask_ai, ask_ai_json
 
+# ==========================================
+# INTERVIEW QUESTION BANK
+# ==========================================
 
+TECHNICAL_QUESTION_BANK = {
+    "Software Engineer": [
+        "Explain the difference between a stack and a queue.",
+        "What is the time complexity of binary search?",
+        "What is object-oriented programming?",
+        "How would you debug a program that is producing incorrect output?",
+        "Explain the difference between a process and a thread."
+    ],
+
+    "Data Analyst": [
+        "What is the difference between INNER JOIN and LEFT JOIN?",
+        "How would you handle missing data in a dataset?",
+        "Explain the difference between mean and median.",
+        "How would you identify an outlier in a dataset?",
+        "What steps would you take when starting a new data analysis project?"
+    ],
+
+    "Web Developer": [
+        "What is the difference between HTTP and HTTPS?",
+        "Explain the difference between frontend and backend development.",
+        "What is a REST API?",
+        "What happens when you enter a URL into a browser?",
+        "What is the difference between authentication and authorization?"
+    ],
+
+    "AI / ML Engineer": [
+        "What is the difference between supervised and unsupervised learning?",
+        "What is overfitting and how can it be reduced?",
+        "Explain the purpose of a training and testing dataset.",
+        "What is a neural network?",
+        "How would you evaluate a machine learning model?"
+    ]
+}
+
+
+BEHAVIORAL_QUESTION_BANK = [
+    "Tell me about yourself.",
+    "Why are you interested in this role?",
+    "Tell me about a difficult problem you solved.",
+    "Describe a time you worked as part of a team.",
+    "Tell me about a mistake you made and what you learned from it.",
+    "How do you handle disagreement with a teammate?",
+    "Describe a situation where you had to learn something quickly.",
+    "What are your greatest strengths?",
+    "What is one area you are currently trying to improve?",
+    "Where do you see yourself developing professionally?"
+]
 # ==========================================
 # PAGE CONFIGURATION
 # ==========================================
@@ -638,8 +688,6 @@ JOB DESCRIPTION:
                         st.info(
                             str(rewrite)
                         )
-
-
 # ==========================================
 # MOCK INTERVIEW
 # ==========================================
@@ -649,13 +697,17 @@ elif page == "🎤 Mock Interview":
     st.title("🎤 AI Mock Interview")
 
     st.write(
-        "Practice realistic interview questions "
-        "and receive structured AI feedback."
+        "Practice realistic, AI-generated interview questions "
+        "and receive structured feedback."
     )
 
     st.divider()
 
-    col1, col2 = st.columns(2)
+    # --------------------------------------
+    # INTERVIEW SETTINGS
+    # --------------------------------------
+
+    col1, col2, col3 = st.columns(3)
 
     with col1:
 
@@ -672,6 +724,17 @@ elif page == "🎤 Mock Interview":
 
     with col2:
 
+        interview_type = st.selectbox(
+            "Interview Type",
+            [
+                "Technical",
+                "Behavioral / HR",
+                "Mixed"
+            ]
+        )
+
+    with col3:
+
         difficulty = st.selectbox(
             "Difficulty",
             [
@@ -682,101 +745,196 @@ elif page == "🎤 Mock Interview":
         )
 
     st.info(
-        f"🎯 Target: **{role}** | "
-        f"Difficulty: **{difficulty}**"
+        f"🎯 **{role}** | "
+        f"💬 **{interview_type}** | "
+        f"📈 **{difficulty}**"
     )
 
-    st.subheader(
-        "💬 Interview Question"
-    )
-
-    st.write(
-        "**Tell me about yourself and why you "
-        "are interested in this role.**"
-    )
-
-    answer = st.text_area(
-        "Your answer",
-        height=220,
-        placeholder=(
-            "Type your answer as if you were "
-            "speaking to the interviewer..."
-        )
-    )
+    # --------------------------------------
+    # GENERATE QUESTION
+    # --------------------------------------
 
     if st.button(
-        "🤖 Evaluate My Answer",
+        "🎲 Generate Interview Question",
         type="primary",
         use_container_width=True
     ):
 
-        if not answer.strip():
+        question_prompt = f"""
+You are an expert technical recruiter and
+interview coach.
 
-            st.warning(
-                "⚠️ Please enter your answer."
-            )
+Generate ONE realistic interview question.
 
-        else:
-
-            prompt = f"""
-You are an expert interview coach.
-
-Evaluate this candidate's answer.
-
-ROLE:
+TARGET ROLE:
 {role}
+
+INTERVIEW TYPE:
+{interview_type}
 
 DIFFICULTY:
 {difficulty}
 
-QUESTION:
-Tell me about yourself and why you
-are interested in this role.
+Rules:
 
-ANSWER:
+- The question must be appropriate for the role.
+- The question must match the selected interview type.
+- The difficulty must match the selected level.
+- Do not provide the answer.
+- Do not provide explanations.
+- Return ONLY the interview question.
+"""
+
+        with st.spinner(
+            "🤖 Generating interview question..."
+        ):
+
+            generated_question = ask_ai(
+                question_prompt
+            )
+
+        if generated_question.startswith(
+            "AI Error:"
+        ):
+
+            st.error(
+                generated_question
+            )
+
+        else:
+
+            st.session_state.interview_question = (
+                generated_question.strip()
+            )
+
+            st.session_state.interview_role = role
+
+            st.session_state.interview_type = (
+                interview_type
+            )
+
+            st.session_state.interview_difficulty = (
+                difficulty
+            )
+
+    # --------------------------------------
+    # DISPLAY GENERATED QUESTION
+    # --------------------------------------
+
+    if "interview_question" in st.session_state:
+
+        st.divider()
+
+        st.subheader(
+            "💬 Interview Question"
+        )
+
+        st.info(
+            st.session_state.interview_question
+        )
+
+        st.subheader(
+            "✍️ Your Answer"
+        )
+
+        answer = st.text_area(
+            "Answer the interviewer",
+            height=220,
+            placeholder=(
+                "Type your answer as if you were "
+                "speaking to an interviewer..."
+            ),
+            key="interview_answer"
+        )
+
+        # ----------------------------------
+        # EVALUATE ANSWER
+        # ----------------------------------
+
+        if st.button(
+            "🤖 Evaluate My Answer",
+            type="primary",
+            use_container_width=True
+        ):
+
+            if not answer.strip():
+
+                st.warning(
+                    "⚠️ Please enter an answer."
+                )
+
+            else:
+
+                evaluation_prompt = f"""
+You are an expert interview coach.
+
+Evaluate the candidate's answer objectively.
+
+ROLE:
+{st.session_state.interview_role}
+
+INTERVIEW TYPE:
+{st.session_state.interview_type}
+
+DIFFICULTY:
+{st.session_state.interview_difficulty}
+
+QUESTION:
+{st.session_state.interview_question}
+
+CANDIDATE ANSWER:
 {answer}
 
-Evaluate:
+Evaluate the answer on:
 
 1. Relevance
 2. Clarity
 3. Confidence
 4. Structure
 5. Communication
-6. Overall score from 0-100
 
-Then provide:
+Give each category a score from 0-100.
+
+Then calculate an overall score from 0-100.
+
+Also provide:
 
 WHAT WAS DONE WELL:
-3 specific strengths.
+Exactly 3 points.
 
 WHAT TO IMPROVE:
-3 specific improvements.
+Exactly 3 points.
 
-BETTER STRUCTURE:
-Explain how the answer could be structured.
+BETTER ANSWER STRUCTURE:
+Give a practical structure the candidate
+could use to answer this question better.
 
 COACHING TIP:
-One practical tip.
+Give exactly one practical interview tip.
 
+IMPORTANT:
 Do not invent facts about the candidate.
+Only evaluate what is actually present
+in the answer.
 """
 
-            with st.spinner(
-                "🤖 Evaluating answer..."
-            ):
+                with st.spinner(
+                    "🤖 Evaluating your answer..."
+                ):
 
-                feedback = ask_ai(prompt)
+                    feedback = ask_ai(
+                        evaluation_prompt
+                    )
 
-            st.divider()
+                st.divider()
 
-            st.header(
-                "📊 Interview Feedback"
-            )
+                st.header(
+                    "📊 Interview Feedback"
+                )
 
-            st.write(feedback)
-
-
+                st.write(
+                    feedback
+                )
 # ==========================================
 # PROGRESS
 # ==========================================
