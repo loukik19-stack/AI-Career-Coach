@@ -129,6 +129,8 @@ if "interview_difficulty" not in st.session_state:
 
 if "interview_feedback" not in st.session_state:
     st.session_state.interview_feedback = None
+if "interview_history" not in st.session_state:
+    st.session_state.interview_history = []
 if "interview_scores" not in st.session_state:
     st.session_state.interview_scores = []
 
@@ -790,6 +792,20 @@ IMPORTANT:
                     feedback = ask_ai_json(evaluation_prompt)
 
                 st.session_state.interview_feedback = feedback
+
+                if isinstance(feedback, dict) and "error" not in feedback:
+                 st.session_state.interview_history.append(
+                               {
+            "role": st.session_state.interview_role,
+            "type": st.session_state.interview_type,
+            "difficulty": st.session_state.interview_difficulty,
+            "overall_score": feedback.get("overall_score", 0),
+            "relevance": feedback.get("relevance", 0),
+            "clarity": feedback.get("clarity", 0),
+            "confidence": feedback.get("confidence", 0),
+            "structure": feedback.get("structure", 0),
+        }
+    )
                 if "overall_score" in feedback:
                  st.session_state.interview_scores.append(
         feedback["overall_score"]
@@ -865,6 +881,7 @@ elif page == "📊 Progress":
     st.write("Your career preparation dashboard.")
 
     st.divider()
+
 
     # --------------------------------------
     # INTERVIEW STATISTICS
