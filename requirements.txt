@@ -5,3 +5,4 @@ pandas
 python-dotenv
 openai
 google-genai
+SQLAlchemy
