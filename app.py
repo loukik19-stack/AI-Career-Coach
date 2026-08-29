@@ -6,7 +6,13 @@ from resume_parser import extract_text_from_pdf
 
 from ai_engine import ask_ai, ask_ai_json
 
-from database import init_database
+from database import (
+    init_database,
+    get_db,
+    User,
+    Resume,
+    ResumeVersion,
+)
 
 # ==========================================
 # DATABASE INITIALIZATION
@@ -14,7 +20,31 @@ from database import init_database
 
 init_database()
 
+# ==========================================
+# TEMPORARY USER
+# ==========================================
 
+def get_current_user():
+    db = get_db()
+
+    try:
+        user = db.query(User).filter_by(
+            email="demo@careerai.local"
+        ).first()
+
+        if user is None:
+            user = User(
+                name="Demo Candidate",
+                email="demo@careerai.local",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        return user
+
+    finally:
+        db.close()
 # ==========================================
 # INTERVIEW QUESTION BANK
 # ==========================================
@@ -157,6 +187,7 @@ page = st.sidebar.radio(
     "Navigation",
     [
         "🏠 Dashboard",
+        "📁 My Resumes",
         "📄 Resume Analyzer",
         "🎤 Mock Interview",
         "📊 Progress"
@@ -269,6 +300,105 @@ if page == "🏠 Dashboard":
 # ==========================================
 # RESUME ANALYZER
 # ==========================================
+elif page == "📁 My Resumes":
+
+    st.title("📁 My Resumes")
+
+    st.write(
+        "Manage your resumes and track different versions "
+        "for different career targets."
+    )
+
+    st.divider()
+
+    user = get_current_user()
+    db = get_db()
+
+    try:
+
+        resumes = (
+            db.query(Resume)
+            .filter(Resume.user_id == user.id)
+            .order_by(Resume.created_at.desc())
+            .all()
+        )
+
+        if not resumes:
+
+            st.info(
+                "You haven't saved any resumes yet. "
+                "Go to Resume Intelligence to upload your first resume."
+            )
+
+        else:
+
+            for resume in resumes:
+
+                st.subheader(resume.title)
+
+                versions = (
+                    db.query(ResumeVersion)
+                    .filter(
+                        ResumeVersion.resume_id == resume.id
+                    )
+                    .order_by(
+                        ResumeVersion.version_number.desc()
+                    )
+                    .all()
+                )
+
+                if versions:
+
+                    for version in versions:
+
+                        current_label = (
+                            "Current"
+                            if version.is_current
+                            else "Archived"
+                        )
+
+                        st.write(
+                            f"**Version {version.version_number}** "
+                            f"— {current_label}"
+                        )
+
+                        if version.created_at:
+                            st.caption(
+                                f"Created: "
+                                f"{version.created_at.strftime('%d %b %Y, %H:%M')}"
+                            )
+
+                        if version.match_score is not None:
+                            st.write(
+                                f"Match Score: "
+                                f"{version.match_score:.0f}%"
+                            )
+
+                        if version.ats_score is not None:
+                            st.write(
+                                f"ATS Score: "
+                                f"{version.ats_score:.0f}%"
+                            )
+
+                        st.divider()
+
+                else:
+
+                    st.info(
+                        "No versions found for this resume."
+                    )
+
+    except Exception as e:
+
+        st.error(
+            f"Unable to load your resumes: {e}"
+        )
+
+    finally:
+
+        db.close()
+
+
 
 elif page == "📄 Resume Analyzer":
 
@@ -279,8 +409,251 @@ elif page == "📄 Resume Analyzer":
         "and identify exactly what you should improve."
     )
 
+    st.divider()   
+
+    st.subheader("Upload your resume")
+
+    uploaded_file = st.file_uploader(
+        "Upload your resume as a PDF",
+        type=["pdf"],
+        help="Upload the latest version of your resume.",
+    )
+
+    if uploaded_file is not None:
+
+        st.success(f"Resume loaded: {uploaded_file.name}")
+
+        if st.button(
+            "💾 Save Resume",
+            type="primary",
+            key="save_resume",
+        ):
+
+            user = get_current_user()
+            db = get_db()
+
+            try:
+                # Create the resume record
+                resume = Resume(
+                    user_id=user.id,
+                    title=uploaded_file.name.rsplit(".", 1)[0],
+                    file_name=uploaded_file.name,
+                )
+
+                db.add(resume)
+                db.commit()
+                db.refresh(resume)
+
+                # Extract resume text
+                resume_text = extract_text_from_pdf(uploaded_file)
+
+                # Create Version 1
+                version = ResumeVersion(
+                    resume_id=resume.id,
+                    version_number=1,
+                    content=resume_text,
+                    is_current=True,
+                )
+
+                db.add(version)
+                db.commit()
+
+                st.success(
+                    "✅ Resume saved successfully as Version 1."
+                )
+
+            except Exception as e:
+
+                db.rollback()
+
+                st.error(
+                    f"Could not save resume: {e}"
+                )
+
+            finally:
+
+                db.close()
     st.divider()
 
+    st.subheader("🎯 Target Job")
+
+    role_title = st.text_input(
+        "Target role",
+        placeholder="e.g. Software Engineer",
+    )
+
+    company_name = st.text_input(
+        "Company (optional)",
+        placeholder="e.g. Microsoft",
+    )
+
+    job_description = st.text_area(
+        "Paste the job description",
+        height=250,
+        placeholder=(
+            "Paste the complete job description here..."
+        ),
+    )
+    if st.button(
+        "🔍 Analyze Resume Against Job",
+        type="primary",
+        key="analyze_resume_job",
+    ):
+
+        if uploaded_file is None:
+
+            st.warning(
+                "Please upload a resume first."
+            )
+
+        elif not role_title.strip():
+
+            st.warning(
+                "Please enter the target role."
+            )
+
+        elif not job_description.strip():
+
+            st.warning(
+                "Please paste the job description."
+            )
+
+        else:
+
+            with st.spinner(
+                "Analyzing your resume against the target role..."
+            ):
+
+                resume_text = extract_text_from_pdf(
+                    uploaded_file
+                )
+
+                prompt = f"""
+You are an expert ATS and career advisor.
+
+Analyze the candidate's resume against the target job.
+
+TARGET ROLE:
+{role_title}
+
+COMPANY:
+{company_name}
+
+JOB DESCRIPTION:
+{job_description}
+
+RESUME:
+{resume_text}
+
+Return ONLY valid JSON.
+
+Use exactly this structure:
+
+{{
+    "match_score": 0,
+    "ats_score": 0,
+    "matched_skills": [],
+    "missing_skills": [],
+    "weak_skills": [],
+    "experience_gaps": [],
+    "ats_keywords": [],
+    "resume_improvements": [],
+    "high_priority_actions": [],
+    "overall_assessment": "",
+    "rewrite_suggestions": []
+}}
+
+Rules:
+
+1. Scores must be integers from 0 to 100.
+2. Do not invent candidate experience.
+3. Do not claim the candidate has a skill unless the resume supports it.
+4. Missing skills must come from the job description.
+5. Weak skills are skills that appear in the resume but are weakly demonstrated.
+6. Give practical, actionable recommendations.
+7. Rewrite suggestions must preserve factual accuracy.
+"""
+
+                result = ask_ai_json(prompt)
+
+            if result:
+
+                st.success(
+                    "Analysis completed successfully."
+                )
+
+                st.subheader("📊 Role Match")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.metric(
+                        "Match Score",
+                        f"{result.get('match_score', 0)}%",
+                    )
+
+                with col2:
+                    st.metric(
+                        "ATS Score",
+                        f"{result.get('ats_score', 0)}%",
+                    )
+
+                st.subheader("✅ Matched Skills")
+
+                for skill in result.get(
+                    "matched_skills", []
+                ):
+                    st.write(f"• {skill}")
+
+                st.subheader("⚠️ Missing Skills")
+
+                for skill in result.get(
+                    "missing_skills", []
+                ):
+                    st.write(f"• {skill}")
+
+                st.subheader("🔧 Weak Skills")
+
+                for skill in result.get(
+                    "weak_skills", []
+                ):
+                    st.write(f"• {skill}")
+
+                st.subheader("📌 Experience Gaps")
+
+                for gap in result.get(
+                    "experience_gaps", []
+                ):
+                    st.write(f"• {gap}")
+
+                st.subheader(
+                    "🚀 High-Priority Actions"
+                )
+
+                for action in result.get(
+                    "high_priority_actions", []
+                ):
+                    st.write(f"• {action}")
+
+                st.subheader(
+                    "📝 Resume Improvements"
+                )
+
+                for improvement in result.get(
+                    "resume_improvements", []
+                ):
+                    st.write(f"• {improvement}")
+
+                st.subheader(
+                    "💡 Overall Assessment"
+                )
+
+                st.write(
+                    result.get(
+                        "overall_assessment",
+                        "No assessment available.",
+                    )
+                )            
     # --------------------------------------
     # RESUME VERSION
     # --------------------------------------
