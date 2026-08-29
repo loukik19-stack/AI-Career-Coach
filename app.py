@@ -3,7 +3,16 @@ import random
 import streamlit as st
 
 from resume_parser import extract_text_from_pdf
+
 from ai_engine import ask_ai, ask_ai_json
+
+from database import init_database
+
+# ==========================================
+# DATABASE INITIALIZATION
+# ==========================================
+
+init_database()
 
 
 # ==========================================
