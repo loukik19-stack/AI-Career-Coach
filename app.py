@@ -1,7 +1,10 @@
+import random
+
 import streamlit as st
 
 from resume_parser import extract_text_from_pdf
 from ai_engine import ask_ai, ask_ai_json
+
 
 # ==========================================
 # INTERVIEW QUESTION BANK
@@ -54,6 +57,21 @@ BEHAVIORAL_QUESTION_BANK = [
     "What is one area you are currently trying to improve?",
     "Where do you see yourself developing professionally?"
 ]
+
+
+def get_fallback_question(role, interview_type, difficulty):
+    """Return a bank-based question when the AI service is unavailable."""
+    del difficulty
+
+    if interview_type == "Behavioral / HR":
+        return random.choice(BEHAVIORAL_QUESTION_BANK)
+
+    if role in TECHNICAL_QUESTION_BANK:
+        return random.choice(TECHNICAL_QUESTION_BANK[role])
+
+    return random.choice(BEHAVIORAL_QUESTION_BANK)
+
+
 # ==========================================
 # PAGE CONFIGURATION
 # ==========================================
@@ -89,6 +107,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+# ==========================================
+# SESSION STATE
+# ==========================================
+
+if "resume_versions" not in st.session_state:
+    st.session_state.resume_versions = []
+
+if "interview_question" not in st.session_state:
+    st.session_state.interview_question = None
+
+if "interview_role" not in st.session_state:
+    st.session_state.interview_role = None
+
+if "interview_type" not in st.session_state:
+    st.session_state.interview_type = None
+
+if "interview_difficulty" not in st.session_state:
+    st.session_state.interview_difficulty = None
+
+if "interview_feedback" not in st.session_state:
+    st.session_state.interview_feedback = None
+if "interview_scores" not in st.session_state:
+    st.session_state.interview_scores = []
 
 # ==========================================
 # SIDEBAR
@@ -212,13 +254,7 @@ if page == "🏠 Dashboard":
         st.markdown("### 5️⃣")
         st.write("Track Progress")
 
-# ==========================================
-# RESUME VERSION STORAGE
-# ==========================================
 
-if "resume_versions" not in st.session_state:
-
-    st.session_state.resume_versions = []
 # ==========================================
 # RESUME ANALYZER
 # ==========================================
@@ -233,6 +269,7 @@ elif page == "📄 Resume Analyzer":
     )
 
     st.divider()
+
     # --------------------------------------
     # RESUME VERSION
     # --------------------------------------
@@ -252,6 +289,7 @@ elif page == "📄 Resume Analyzer":
         "📌 Resume Version Name",
         placeholder="Example: Software Engineer - Version 1"
     )
+
     col1, col2 = st.columns(2)
 
     # --------------------------------------
@@ -268,39 +306,33 @@ elif page == "📄 Resume Analyzer":
         )
 
         if uploaded_file:
+            st.success(f"✓ {uploaded_file.name}")
 
-            st.success(
-                f"✓ {uploaded_file.name}"
-            )
-        if st.button(
-            "💾 Save Resume Version",
-            use_container_width=True
-        ):
+        if st.button("💾 Save Resume Version", use_container_width=True):
 
-            if not resume_version.strip():
+            if not uploaded_file:
+                st.warning("Please upload your resume PDF.")
 
-                st.warning(
-                    "Please enter a resume version name."
-                )
+            elif not resume_version.strip():
+                st.warning("Please enter a resume version name.")
 
             else:
+                resume_text = extract_text_from_pdf(uploaded_file)
 
-                resume_text = extract_text_from_pdf(
-                    uploaded_file
-                )
+                if not resume_text.strip():
+                    st.warning("The uploaded PDF could not be read. Please upload a valid, text-based PDF.")
+                else:
+                    st.session_state.resume_versions.append(
+                        {
+                            "role": resume_role,
+                            "version": resume_version,
+                            "filename": uploaded_file.name,
+                            "text": resume_text
+                        }
+                    )
 
-                st.session_state.resume_versions.append(
-                    {
-                        "role": resume_role,
-                        "version": resume_version,
-                        "filename": uploaded_file.name,
-                        "text": resume_text
-                    }
-                )
+                    st.success(f"✓ Saved '{resume_version}' for {resume_role}")
 
-                st.success(
-                    f"✓ Saved '{resume_version}' for {resume_role}"
-                )
     # --------------------------------------
     # JOB DESCRIPTION INPUT
     # --------------------------------------
@@ -312,16 +344,15 @@ elif page == "📄 Resume Analyzer":
         job_description = st.text_area(
             "Paste the job description",
             height=220,
-            placeholder=(
-                "Paste the complete job description here..."
-            )
+            placeholder="Paste the complete job description here..."
         )
 
     st.divider()
 
     # --------------------------------------
-    # ANALYZE
+    # SAVED RESUME VERSIONS
     # --------------------------------------
+
     if st.session_state.resume_versions:
         st.subheader("📚 Saved Resume Versions")
 
@@ -330,48 +361,26 @@ elif page == "📄 Resume Analyzer":
                 f"**{saved_resume['role']}** — "
                 f"{saved_resume['version']}"
             )
-    if st.button(
-        "🤖 Analyze Resume",
-        type="primary",
-        use_container_width=True
-    ):
+
+    # --------------------------------------
+    # ANALYZE
+    # --------------------------------------
+
+    if st.button("🤖 Analyze Resume", type="primary", use_container_width=True):
 
         if not uploaded_file:
-
-            st.warning(
-                "⚠️ Please upload your resume PDF."
-            )
+            st.warning("⚠️ Please upload your resume PDF.")
 
         elif not job_description.strip():
-
-            st.warning(
-                "⚠️ Please paste the job description."
-            )
+            st.warning("⚠️ Please paste the job description.")
 
         else:
-
-            # Extract resume text
-
-            with st.spinner(
-                "📄 Reading resume..."
-            ):
-
-                resume_text = extract_text_from_pdf(
-                    uploaded_file
-                )
+            with st.spinner("📄 Reading resume..."):
+                resume_text = extract_text_from_pdf(uploaded_file)
 
             if not resume_text.strip():
-
-                st.error(
-                    "Could not extract text from this PDF."
-                )
-
+                st.error("Could not extract text from this PDF. Please upload a readable PDF.")
             else:
-
-                # --------------------------------------
-                # STRUCTURED AI PROMPT
-                # --------------------------------------
-
                 prompt = f"""
 You are an expert ATS resume analyst,
 technical recruiter, and career coach.
@@ -468,285 +477,104 @@ JOB DESCRIPTION:
 {job_description}
 """
 
-                # --------------------------------------
-                # GEMINI ANALYSIS
-                # --------------------------------------
-
-                with st.spinner(
-                    "🤖 Gemini is analyzing your resume..."
-                ):
-
+                with st.spinner("🤖 Gemini is analyzing your resume..."):
                     analysis = ask_ai_json(prompt)
 
-                # --------------------------------------
-                # ERROR CHECK
-                # --------------------------------------
-
                 if "error" in analysis:
-
-                    st.error(
-                        "AI analysis failed."
-                    )
-
-                    st.code(
-                        analysis["error"]
-                    )
-
+                    st.error("AI analysis failed.")
+                    st.code(analysis["error"])
                 else:
-
-                    # ----------------------------------
-                    # SCORE CARDS
-                    # ----------------------------------
-
                     st.divider()
-
                     st.header("🎯 Resume Performance")
 
                     score1, score2 = st.columns(2)
 
                     with score1:
-
-                        st.metric(
-                            "Resume-JD Match",
-                            f"{analysis.get('match_score', 0)}/100"
-                        )
+                        st.metric("Resume-JD Match", f"{analysis.get('match_score', 0)}/100")
 
                     with score2:
-
-                        st.metric(
-                            "ATS Compatibility",
-                            f"{analysis.get('ats_score', 0)}/100"
-                        )
+                        st.metric("ATS Compatibility", f"{analysis.get('ats_score', 0)}/100")
 
                     st.divider()
-
-                    # ----------------------------------
-                    # SKILLS
-                    # ----------------------------------
 
                     skill1, skill2, skill3 = st.columns(3)
 
                     with skill1:
-
                         st.subheader("✅ Matched Skills")
-
-                        matched = analysis.get(
-                            "matched_skills",
-                            []
-                        )
+                        matched = analysis.get("matched_skills", [])
 
                         if matched:
-
                             for skill in matched:
-
-                                st.success(
-                                    str(skill)
-                                )
-
+                                st.success(str(skill))
                         else:
-
-                            st.write(
-                                "No strong matches identified."
-                            )
+                            st.write("No strong matches identified.")
 
                     with skill2:
-
                         st.subheader("⚠️ Missing Skills")
-
-                        missing = analysis.get(
-                            "missing_skills",
-                            []
-                        )
+                        missing = analysis.get("missing_skills", [])
 
                         if missing:
-
                             for skill in missing:
-
-                                st.warning(
-                                    str(skill)
-                                )
-
+                                st.warning(str(skill))
                         else:
-
-                            st.write(
-                                "No major missing skills identified."
-                            )
+                            st.write("No major missing skills identified.")
 
                     with skill3:
-
                         st.subheader("🟡 Weak Skills")
-
-                        weak = analysis.get(
-                            "weak_skills",
-                            []
-                        )
+                        weak = analysis.get("weak_skills", [])
 
                         if weak:
-
                             for skill in weak:
-
-                                st.info(
-                                    str(skill)
-                                )
-
+                                st.info(str(skill))
                         else:
-
-                            st.write(
-                                "No major weak skills identified."
-                            )
-
-                    # ----------------------------------
-                    # EXPERIENCE GAPS
-                    # ----------------------------------
+                            st.write("No major weak skills identified.")
 
                     st.divider()
-
-                    st.subheader(
-                        "📌 Experience Gaps"
-                    )
-
-                    gaps = analysis.get(
-                        "experience_gaps",
-                        []
-                    )
+                    st.subheader("📌 Experience Gaps")
+                    gaps = analysis.get("experience_gaps", [])
 
                     if gaps:
-
                         for gap in gaps:
-
-                            st.write(
-                                f"• {gap}"
-                            )
-
+                            st.write(f"• {gap}")
                     else:
-
-                        st.write(
-                            "No significant experience gaps identified."
-                        )
-
-                    # ----------------------------------
-                    # ATS KEYWORDS
-                    # ----------------------------------
+                        st.write("No significant experience gaps identified.")
 
                     st.divider()
-
-                    st.subheader(
-                        "🔑 Important ATS Keywords"
-                    )
-
-                    keywords = analysis.get(
-                        "ats_keywords",
-                        []
-                    )
+                    st.subheader("🔑 Important ATS Keywords")
+                    keywords = analysis.get("ats_keywords", [])
 
                     if keywords:
-
-                        st.write(
-                            " • ".join(
-                                str(keyword)
-                                for keyword in keywords
-                            )
-                        )
-
+                        st.write(" • ".join(str(keyword) for keyword in keywords))
                     else:
-
-                        st.write(
-                            "No additional keywords identified."
-                        )
-
-                    # ----------------------------------
-                    # IMPROVEMENTS
-                    # ----------------------------------
+                        st.write("No additional keywords identified.")
 
                     st.divider()
+                    st.subheader("💡 Resume Improvements")
+                    improvements = analysis.get("resume_improvements", [])
 
-                    st.subheader(
-                        "💡 Resume Improvements"
-                    )
-
-                    improvements = analysis.get(
-                        "resume_improvements",
-                        []
-                    )
-
-                    for index, improvement in enumerate(
-                        improvements,
-                        start=1
-                    ):
-
-                        st.write(
-                            f"**{index}.** {improvement}"
-                        )
-
-                    # ----------------------------------
-                    # HIGH PRIORITY ACTIONS
-                    # ----------------------------------
+                    for index, improvement in enumerate(improvements, start=1):
+                        st.write(f"**{index}.** {improvement}")
 
                     st.divider()
+                    st.subheader("🎯 High Priority Actions")
+                    actions = analysis.get("high_priority_actions", [])
 
-                    st.subheader(
-                        "🎯 High Priority Actions"
-                    )
-
-                    actions = analysis.get(
-                        "high_priority_actions",
-                        []
-                    )
-
-                    for index, action in enumerate(
-                        actions,
-                        start=1
-                    ):
-
-                        st.write(
-                            f"**{index}.** {action}"
-                        )
-
-                    # ----------------------------------
-                    # OVERALL ASSESSMENT
-                    # ----------------------------------
+                    for index, action in enumerate(actions, start=1):
+                        st.write(f"**{index}.** {action}")
 
                     st.divider()
-
-                    st.subheader(
-                        "🧠 Overall Assessment"
-                    )
-
-                    st.info(
-                        analysis.get(
-                            "overall_assessment",
-                            "No assessment available."
-                        )
-                    )
-
-                    # ----------------------------------
-                    # REWRITE SUGGESTIONS
-                    # ----------------------------------
+                    st.subheader("🧠 Overall Assessment")
+                    st.info(analysis.get("overall_assessment", "No assessment available."))
 
                     st.divider()
+                    st.subheader("✍️ Resume Rewrite Suggestions")
+                    rewrites = analysis.get("rewrite_suggestions", [])
 
-                    st.subheader(
-                        "✍️ Resume Rewrite Suggestions"
-                    )
+                    for index, rewrite in enumerate(rewrites, start=1):
+                        st.write(f"**Example {index}**")
+                        st.info(str(rewrite))
 
-                    rewrites = analysis.get(
-                        "rewrite_suggestions",
-                        []
-                    )
 
-                    for index, rewrite in enumerate(
-                        rewrites,
-                        start=1
-                    ):
-
-                        st.write(
-                            f"**Example {index}**"
-
-                        )
-
-                        st.info(
-                            str(rewrite)
-                        )
 # ==========================================
 # MOCK INTERVIEW
 # ==========================================
@@ -769,7 +597,6 @@ elif page == "🎤 Mock Interview":
     col1, col2, col3 = st.columns(3)
 
     with col1:
-
         role = st.selectbox(
             "Target Role",
             [
@@ -782,7 +609,6 @@ elif page == "🎤 Mock Interview":
         )
 
     with col2:
-
         interview_type = st.selectbox(
             "Interview Type",
             [
@@ -793,7 +619,6 @@ elif page == "🎤 Mock Interview":
         )
 
     with col3:
-
         difficulty = st.selectbox(
             "Difficulty",
             [
@@ -813,11 +638,7 @@ elif page == "🎤 Mock Interview":
     # GENERATE QUESTION
     # --------------------------------------
 
-    if st.button(
-        "🎲 Generate Interview Question",
-        type="primary",
-        use_container_width=True
-    ):
+    if st.button("🎲 Generate Interview Question", type="primary", use_container_width=True):
 
         question_prompt = f"""
 You are an expert technical recruiter and
@@ -844,65 +665,35 @@ Rules:
 - Return ONLY the interview question.
 """
 
-        with st.spinner(
-            "🤖 Generating interview question..."
-        ):
+        with st.spinner("🤖 Generating interview question..."):
+            generated_question = ask_ai(question_prompt)
 
-            generated_question = ask_ai(
-                question_prompt
-            )
+        if generated_question.startswith("AI Error:"):
+            st.warning("AI generation is unavailable. Using a fallback question from the built-in bank.")
+            generated_question = get_fallback_question(role, interview_type, difficulty)
 
-        if generated_question.startswith(
-            "AI Error:"
-        ):
-
-            st.error(
-                generated_question
-            )
-
-        else:
-
-            st.session_state.interview_question = (
-                generated_question.strip()
-            )
-
-            st.session_state.interview_role = role
-
-            st.session_state.interview_type = (
-                interview_type
-            )
-
-            st.session_state.interview_difficulty = (
-                difficulty
-            )
+        st.session_state.interview_question = generated_question.strip()
+        st.session_state.interview_role = role
+        st.session_state.interview_type = interview_type
+        st.session_state.interview_difficulty = difficulty
+        st.session_state.interview_feedback = None
 
     # --------------------------------------
     # DISPLAY GENERATED QUESTION
     # --------------------------------------
 
-    if "interview_question" in st.session_state:
+    if st.session_state.interview_question:
 
         st.divider()
+        st.subheader("💬 Interview Question")
+        st.info(st.session_state.interview_question)
 
-        st.subheader(
-            "💬 Interview Question"
-        )
-
-        st.info(
-            st.session_state.interview_question
-        )
-
-        st.subheader(
-            "✍️ Your Answer"
-        )
+        st.subheader("✍️ Your Answer")
 
         answer = st.text_area(
             "Answer the interviewer",
             height=220,
-            placeholder=(
-                "Type your answer as if you were "
-                "speaking to an interviewer..."
-            ),
+            placeholder="Type your answer as if you were speaking to an interviewer...",
             key="interview_answer"
         )
 
@@ -910,20 +701,11 @@ Rules:
         # EVALUATE ANSWER
         # ----------------------------------
 
-        if st.button(
-            "🤖 Evaluate My Answer",
-            type="primary",
-            use_container_width=True
-        ):
+        if st.button("🤖 Evaluate My Answer", type="primary", use_container_width=True):
 
             if not answer.strip():
-
-                st.warning(
-                    "⚠️ Please enter an answer."
-                )
-
+                st.warning("⚠️ Please enter an answer.")
             else:
-
                 evaluation_prompt = f"""
 You are an expert interview coach and recruiter.
 
@@ -1004,27 +786,72 @@ IMPORTANT:
 - Return ONLY valid JSON.
 """
 
-                with st.spinner(
-                    "🤖 Evaluating your answer..."
-                ):
-
+                with st.spinner("🤖 Evaluating your answer..."):
                     feedback = ask_ai_json(evaluation_prompt)
 
-st.divider()
-
-st.header(
-    "📊 Interview Feedback"
-)
-
-if "error" in feedback:
-
-    st.error(
-        "AI evaluation failed."
+                st.session_state.interview_feedback = feedback
+                if "overall_score" in feedback:
+                 st.session_state.interview_scores.append(
+        feedback["overall_score"]
     )
 
-    st.code(
-        feedback["error"]
-    )
+    # --------------------------------------
+    # INTERVIEW FEEDBACK
+    # --------------------------------------
+
+    if st.session_state.interview_feedback:
+
+        feedback = st.session_state.interview_feedback
+
+        st.divider()
+        st.header("📊 Interview Feedback")
+
+        if "error" in feedback:
+            st.error("AI evaluation failed.")
+            st.code(feedback["error"])
+
+        else:
+            st.subheader("📈 Performance Scores")
+
+            score1, score2, score3 = st.columns(3)
+
+            with score1:
+                st.metric("Overall Score", f"{feedback.get('overall_score', 0)}/100")
+
+            with score2:
+                st.metric("Relevance", f"{feedback.get('relevance', 0)}/100")
+
+            with score3:
+                st.metric("Clarity", f"{feedback.get('clarity', 0)}/100")
+
+            score4, score5 = st.columns(2)
+
+            with score4:
+                st.metric("Confidence", f"{feedback.get('confidence', 0)}/100")
+
+            with score5:
+                st.metric("Structure", f"{feedback.get('structure', 0)}/100")
+
+            st.divider()
+            st.subheader("✅ What You Did Well")
+
+            positives = feedback.get("what_was_done_well", [])
+
+            for index, point in enumerate(positives, start=1):
+                st.success(f"**{index}.** {point}")
+
+            st.subheader("⚠️ What To Improve")
+
+            improvements = feedback.get("what_to_improve", [])
+
+            for index, point in enumerate(improvements, start=1):
+                st.warning(f"**{index}.** {point}")
+
+            st.subheader("🧩 Better Answer Structure")
+            st.info(feedback.get("better_answer_structure", "No structure provided."))
+
+            st.subheader("🎯 Coaching Tip")
+            st.info(feedback.get("coaching_tip", "No coaching tip available."))
 
 
 # ==========================================
@@ -1033,44 +860,85 @@ if "error" in feedback:
 
 elif page == "📊 Progress":
 
-    st.title(
-        "📊 Preparation Progress"
-    )
+    st.title("📊 Preparation Progress")
 
-    st.write(
-        "Your career preparation dashboard."
-    )
+    st.write("Your career preparation dashboard.")
 
     st.divider()
+
+    # --------------------------------------
+    # INTERVIEW STATISTICS
+    # --------------------------------------
+
+    interview_scores = st.session_state.interview_scores
+
+    interview_count = len(interview_scores)
+
+    if interview_scores:
+        average_score = round(
+            sum(interview_scores) / len(interview_scores)
+        )
+    else:
+        average_score = None
+
+    # --------------------------------------
+    # PROGRESS METRICS
+    # --------------------------------------
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-
         st.metric(
             "Resume Score",
             "—"
         )
 
     with col2:
-
         st.metric(
             "Interviews",
-            "0"
+            interview_count
         )
 
     with col3:
-
         st.metric(
             "Average Score",
-            "—"
+            f"{average_score}/100"
+            if average_score is not None
+            else "—"
         )
 
     st.divider()
 
-    st.subheader(
-        "🎯 Preparation Roadmap"
-    )
+    # --------------------------------------
+    # INTERVIEW PERFORMANCE
+    # --------------------------------------
+
+    st.subheader("🎤 Interview Performance")
+
+    if interview_scores:
+
+        for index, score in enumerate(
+            interview_scores,
+            start=1
+        ):
+            st.write(
+                f"**Interview {index}:** {score}/100"
+            )
+
+    else:
+
+        st.info(
+            "Complete your first mock interview to "
+            "start tracking your performance."
+        )
+
+    st.divider()
+
+    # --------------------------------------
+    # PREPARATION ROADMAP
+    # --------------------------------------
+
+    st.subheader("🎯 Preparation Roadmap")
 
     st.write(
         """
